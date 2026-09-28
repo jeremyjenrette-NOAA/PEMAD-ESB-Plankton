@@ -202,6 +202,23 @@ def main(argv=None):
             applied_corr += 1
         resolved = set(corr.roi_id + ".png")
         conflicts = [c for c in conflicts if c["ROI_file"] not in resolved]
+
+    # Labels made in the new-day eval labeler (exported from its shared store).
+    applied_eval = 0
+    eval_path = out / "eval_newdays_labels.csv"
+    if eval_path.exists():
+        ev = pd.read_csv(eval_path, dtype=str, keep_default_na=False)
+        idx = pd.Series(df.index, index=df.roi_id)
+        for e in ev.itertuples(index=False):
+            if e.roi_id not in idx.index or e.triage not in TRIAGE_CLASSES:
+                continue
+            i = idx[e.roi_id]
+            df.at[i, "triage"] = e.triage
+            df.at[i, "needs_box"] = e.needs_box
+            df.at[i, "triage_source"] = "eval_labeler"
+            if e.note:
+                df.at[i, "notes"] = e.note
+            applied_eval += 1
     for c in ["frame_x0", "frame_y0", "frame_x1", "frame_y1"]:
         df[c] = df[c].map(lambda v: "" if v == "" else str(int(v)))
     df.to_csv(out / "labels.csv", index=False)
@@ -219,6 +236,7 @@ def main(argv=None):
          f"- Labeled ROIs (triage set): {len(lab):,} ({len(lab)/len(df):.1%})",
          f"- Manual corrections applied (`corrections.csv`): {applied_corr}",
          f"- Unresolved conflicts (`conflicts.csv`): {len(conflicts)}",
+         f"- Eval-labeler labels applied (`eval_newdays_labels.csv`): {applied_eval}",
          f"- Annotation rows with no image on disk: {len(ann_not_found)}",
          f"- Images with no annotation row: {len(img_not_in_ann)}",
          f"- Images with no ROICoord entry: {no_coord} (duplicate ROICoord lines ignored: {coord_dups}; malformed CTD strings: {bad_ctd})",

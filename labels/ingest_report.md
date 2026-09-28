@@ -3,9 +3,10 @@
 - Annotation file: `V3_Annotations_full_ROI_list_20260729.xlsb.csv` (sha1 af2ade6070d1)
 - ROI images found: 31,532 across 30 days
 - Annotation rows: 31,532 (duplicate filenames dropped: 0)
-- Labeled ROIs (triage set): 3,062 (9.7%)
+- Labeled ROIs (triage set): 3,157 (10.0%)
 - Manual corrections applied (`corrections.csv`): 2
 - Unresolved conflicts (`conflicts.csv`): 0
+- Eval-labeler labels applied (`eval_newdays_labels.csv`): 95
 - Annotation rows with no image on disk: 0
 - Images with no annotation row: 0
 - Images with no ROICoord entry: 798 (duplicate ROICoord lines ignored: 0; malformed CTD strings: 52)
@@ -21,21 +22,21 @@
 
 | class | ROIs | needs_box=true | median width x height (px) |
 |---|---|---|---|
-| organism | 1,274 | 359 | 120 x 122 |
-| marine_snow | 889 | 0 | 100 x 100 |
-| ring | 677 | 0 | 312 x 304 |
-| blurry | 205 | 0 | 76 x 72 |
-| artifact | 16 | 0 | 150 x 234 |
+| organism | 1,283 | 360 | 120 x 124 |
+| marine_snow | 892 | 0 | 100 x 100 |
+| ring | 694 | 0 | 308 x 296 |
+| blurry | 234 | 0 | 76 x 72 |
+| artifact | 53 | 0 | 264 x 364 |
 | other | 1 | 0 | 316 x 252 |
 
 ## Labeled ROIs by day
 
 | day | ROIs | labeled | organism | ring | marine_snow | blurry | artifact |
 |---|---|---|---|---|---|---|---|
-| 20260515 | 155 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 20260516 | 698 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 20260517 | 2,059 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 20260521 | 7,125 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 20260515 | 155 | 4 | 0 | 0 | 1 | 3 | 0 |
+| 20260516 | 698 | 14 | 2 | 1 | 1 | 9 | 1 |
+| 20260517 | 2,059 | 40 | 7 | 16 | 1 | 15 | 1 |
+| 20260521 | 7,125 | 37 | 0 | 0 | 0 | 2 | 35 |
 | 20260522 | 2,609 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 20260523 | 1,194 | 61 | 48 | 3 | 8 | 2 | 0 |
 | 20260524 | 244 | 0 | 0 | 0 | 0 | 0 | 0 |
