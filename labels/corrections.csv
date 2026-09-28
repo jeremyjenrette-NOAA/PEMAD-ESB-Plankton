@@ -1,0 +1,3 @@
+roi_id,field,value,source,date,comment
+20260615_235918.199.2,triage,ring,jeremy,2026-09-28,V3 conflict: Organism=2 but Classification=Ring
+20260523_224612.594.0,triage,organism,jeremy,2026-09-28,V3 conflict: Organism=0 but Classification=Organism

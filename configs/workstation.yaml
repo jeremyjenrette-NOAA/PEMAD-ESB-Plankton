@@ -1,0 +1,9 @@
+# GCP workstation (jeremy-dev-ws6). Images are copied from the bucket with scripts/sync_from_bucket.sh.
+data_root: /home/user/data/CPICS
+annotations: V3_Annotations_full_ROI_list_20260729.xlsb.csv
+rois_dir: rois
+roicoord_dir: rois/ROICoord
+labels_dir: labels
+gcs_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS"
+gcs_ml_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS_ml"
+seed: 20260928

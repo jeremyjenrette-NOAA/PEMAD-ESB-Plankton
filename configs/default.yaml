@@ -1,0 +1,11 @@
+# Paths are relative to data_root unless absolute.
+# Mac (Cowork):     data_root: /Users/jeremy/saltnoaa/CPICS
+# GCP workstation:  data_root: /home/user/data/CPICS   (local copy synced from the bucket)
+data_root: ..
+annotations: V3_Annotations_full_ROI_list_20260729.xlsb.csv
+rois_dir: rois
+roicoord_dir: rois/ROICoord
+labels_dir: labels          # relative to the repo root
+gcs_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS"
+gcs_ml_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS_ml"
+seed: 20260928
