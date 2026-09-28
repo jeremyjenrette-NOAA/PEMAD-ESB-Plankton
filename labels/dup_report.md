@@ -57,4 +57,4 @@
 | 20260521_191959.997.4 | 167 | 28 |
 | 20260521_191959.997.3 | 167 | 28 |
 
-- Labeled groups whose members carry different triage labels: 1
+- Labeled groups whose members carry different triage labels: 0
