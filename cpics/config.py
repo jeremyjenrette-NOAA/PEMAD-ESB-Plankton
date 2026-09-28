@@ -14,4 +14,7 @@ def load(path=None):
         cfg[k] = p if p.is_absolute() else cfg["data_root"] / p
     lab = Path(cfg["labels_dir"])
     cfg["labels_dir"] = lab if lab.is_absolute() else REPO / lab
+    # Large ML outputs (embeddings, predictions, models) live outside git.
+    work = Path(cfg.get("work_dir") or (cfg["data_root"].parent / "cpics_ml"))
+    cfg["work_dir"] = work if work.is_absolute() else (REPO / work).resolve()
     return cfg

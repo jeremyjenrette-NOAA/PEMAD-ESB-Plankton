@@ -7,3 +7,4 @@ labels_dir: labels
 gcs_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS"
 gcs_ml_root: "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS_ml"
 seed: 20260928
+work_dir: /home/user/data/cpics_ml

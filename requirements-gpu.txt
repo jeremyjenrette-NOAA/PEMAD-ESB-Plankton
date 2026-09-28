@@ -1,0 +1,5 @@
+# Phase 1+ on the GPU workstation (torch is already installed there: 2.14 + CUDA 13)
+-r requirements.txt
+timm>=1.0
+open_clip_torch>=2.24
+scikit-learn>=1.4
