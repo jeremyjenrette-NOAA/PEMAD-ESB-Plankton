@@ -25,7 +25,10 @@ def main(argv=None):
     import umap
 
     df = pd.read_csv(cfg["labels_dir"] / "labels.csv", dtype=str, keep_default_na=False)
-    reps = df[df.roi_id == df.dup_group].copy()
+    # One row per object: its labeled capture if any (so labels show on the map), else the earliest.
+    df["_lab"] = (df.triage != "").astype(int)
+    reps = df.sort_values(["dup_group", "_lab", "roi_id"], ascending=[True, False, True]) \
+             .drop_duplicates("dup_group").sort_values("roi_id").copy()
     d = cfg["work_dir"] / "embeddings"
     ids = pd.read_csv(d / f"{args.model}_ids.csv", dtype=str).roi_id
     E = np.load(d / f"{args.model}.npy").astype(np.float32)
