@@ -20,6 +20,8 @@ import pandas as pd
 from PIL import Image
 
 from cpics import config
+import torch
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 MODELS = {
     # timm DINOv2 ViT-B/14 (self-supervised on natural images); pos-embeddings resampled to 224 px
