@@ -15,6 +15,8 @@
     "blurry": 0.6123082542001461,
     "artifact": 0.0025931336742147553
   },
+  "correction_misfit": 0.6014494143828717,
+  "correction_applicable": false,
   "share_objects_corrected": {
     "organism": 0.0,
     "marine_snow": 0.0,

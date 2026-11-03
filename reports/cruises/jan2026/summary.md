@@ -1,6 +1,6 @@
 # Preliminary class shares: jan2026
 
-Run 2026-11-03 17:35. Model: dinov2 embeddings + logistic regression (Phase 1 baseline, C=0.01, trained on 2,219 labeled May-June 2026 objects; no January images were labeled). **Preliminary.**
+Run 2026-11-03 18:06. Model: dinov2 embeddings + logistic regression (Phase 1 baseline, C=0.01, trained on 2,219 labeled May-June 2026 objects; no January images were labeled). **Preliminary.**
 
 - ROIs classified: 27,380; distinct objects: 27,344 (repeat captures averaged)
 - Marine snow : organism (objects) = 26% : 12% (about 2.2 marine-snow particles per organism)
@@ -8,13 +8,13 @@ Run 2026-11-03 17:35. Model: dinov2 embeddings + logistic regression (Phase 1 ba
 
 | class | share of objects (model) | share of ROIs (model) | objects, corrected for known model confusions (90% range) |
 |---|---|---|---|
-| Organism | 11.7% | 11.7% | 0.0% (0%-0%) |
-| Marine snow | 25.7% | 25.6% | 0.0% (0%-0%) |
-| Ring | 1.2% | 1.2% | 0.0% (0%-0%) |
-| Blurry | 61.2% | 61.2% | 100.0% (100%-100%) |
-| Artifact | 0.3% | 0.3% | 0.0% (0%-0%) |
+| Organism | 11.7% | 11.7% | n/a |
+| Marine snow | 25.7% | 25.6% | n/a |
+| Ring | 1.2% | 1.2% | n/a |
+| Blurry | 61.2% | 61.2% | n/a |
+| Artifact | 0.3% | 0.3% | n/a |
 
-The corrected column inverts the confusion matrix the model showed on the eval_newdays set (413 objects from unlabeled May-June days, labeled by Jeremy: organism 28, marine snow 50, ring 116, blurry 183, artifact 36). It assumes January confuses classes the way those days did, which is untested; read the two columns as a range, not a precise value.
+**Correction not applicable** (misfit 0.60 > 0.1). No mix of true classes, confused the way the model confused them on the eval_newdays set (413 objects from unlabeled May-June days, labeled by Jeremy: organism 28, marine snow 50, ring 116, blurry 183, artifact 36), can produce the predicted mix seen on this cruise. The model is behaving differently here than on May-June days (a domain shift), so the class shares above should be treated as rough and checked by eye.
 
 ## By day (objects)
 

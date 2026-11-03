@@ -1,9 +1,9 @@
-region,n,share_all,majority,majority_share,second,text
-1,3766,0.138,blurry,0.926,marine snow 6%,Mostly blurry (93%)
-2,4072,0.149,blurry,0.925,organism 3%,Mostly blurry (93%)
-3,3159,0.116,marine_snow,0.495,blurry 36%,"Mixed, leaning marine snow (49%)"
-4,3634,0.133,blurry,0.566,organism 33%,"Mixed, leaning blurry (57%)"
-5,3304,0.121,blurry,0.828,marine snow 14%,Mostly blurry (83%)
-6,2959,0.108,blurry,0.867,organism 6%,Mostly blurry (87%)
-7,3059,0.112,marine_snow,0.621,blurry 22%,Mostly marine snow (62%)
-8,3391,0.124,marine_snow,0.710,organism 19%,Mostly marine snow (71%)
+region,n,share_all,majority,majority_share,second,second_share,text
+1,3766,0.138,blurry,0.926,marine_snow,0.062,Mostly blurry (93%)
+2,4072,0.149,blurry,0.925,organism,0.027,Mostly blurry (93%)
+3,3159,0.116,marine_snow,0.495,blurry,0.358,"Mixed: marine snow 49%, blurry 36%"
+4,3634,0.133,blurry,0.566,organism,0.330,"Mixed: blurry 57%, organism 33%"
+5,3304,0.121,blurry,0.828,marine_snow,0.141,Mostly blurry (83%)
+6,2959,0.108,blurry,0.867,organism,0.057,Mostly blurry (87%)
+7,3059,0.112,marine_snow,0.621,blurry,0.219,Mostly marine snow (62%)
+8,3391,0.124,marine_snow,0.710,organism,0.192,Mostly marine snow (71%)
