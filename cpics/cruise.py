@@ -571,9 +571,9 @@ def cmd_map(args, cfg):
         atlas_json(obj, read_rois(work).set_index("roi_id"), src_dir(work, args.src), work, args.atlas_sample)
 
 
-def summarise_regions(obj, n_ex):
-    """Majority class per region, its share, a short label, and example objects of the region's main classes
-    (nearest the region centre, so the strip shows what the label says)."""
+def summarise_regions(obj, n_ex, seed=0):
+    """Majority class per region, its share, a short label, and example objects of the region's main classes,
+    drawn at random (seeded) from the region's members of those classes."""
     cen = obj.groupby("region")[["x", "y"]].mean()
     regs = []
     for r, s in obj.groupby("region"):
@@ -583,16 +583,20 @@ def summarise_regions(obj, n_ex):
         mixed = share < 0.6
         text = (f"Mixed: {LABEL[top].lower()} {share:.0%}, {LABEL[sec].lower()} {sec_share:.0%}" if mixed
                 else f"Mostly {LABEL[top].lower()} ({share:.0%})")
-        d = np.hypot(s.x - cen.loc[r, "x"], s.y - cen.loc[r, "y"])
-        s = s.assign(d=d.to_numpy())
         want = [(top, n_ex - n_ex // 2), (sec, n_ex // 2)] if mixed and sec else [(top, n_ex)]
         ex = []
         for c, k in want:
-            pool = s[s.pred == c].nsmallest(k * 4, "d")
-            ex += pool.sample(min(k, len(pool)), random_state=int(r)).sort_values("d").dup_group.tolist()
+            pool = s[s.pred == c]
+            ex += pool.sample(min(k, len(pool)), random_state=seed * 1000 + int(r)).dup_group.tolist()
         regs.append(dict(region=int(r), n=len(s), share_all=len(s) / len(obj), majority=top, majority_share=share,
                          second=sec, second_share=sec_share, text=text, examples=" ".join(ex)))
     return pd.DataFrame(regs), cen
+
+
+def organism_examples(obj, n, seed=0, min_conf=0.0):
+    """A seeded random draw of predicted organisms (optionally only those the model is at least min_conf sure of)."""
+    pool = obj[(obj.pred == "organism") & (obj.confidence >= min_conf)]
+    return pool.sample(min(n, len(pool)), random_state=seed).dup_group.tolist(), len(pool)
 
 
 def cmd_figures(args, cfg, obj=None):
@@ -603,33 +607,48 @@ def cmd_figures(args, cfg, obj=None):
         f = work / "map.csv" if (work / "map.csv").exists() else rep / "map.csv.gz"
         obj = pd.read_csv(f, dtype={"dup_group": str, "day": str, "hour_dir": str})
     rois = read_rois(work).set_index("roi_id")
-    regs, cen = summarise_regions(obj, args.examples)
+    regs, cen = summarise_regions(obj, args.examples, args.seed)
+    org_ids, org_pool = organism_examples(obj, args.organisms, args.seed, args.organism_min_conf)
     regs.drop(columns=["examples"]).to_csv(rep / "map_regions.csv", index=False, float_format="%.3f")
-    regs[["region", "examples"]].to_csv(rep / "map_region_examples.csv", index=False)
-    figures(obj, regs, cen, rois, src_dir(work, args.src), rep, args.title or args.name)
+    ex = regs[["region", "examples"]].copy()
+    ex.loc[len(ex)] = ["organisms", " ".join(org_ids)]
+    ex.assign(seed=args.seed).to_csv(rep / "map_region_examples.csv", index=False)
+    figures(obj, regs, cen, rois, src_dir(work, args.src), rep, args.title or args.name,
+            org_ids, org_pool, args.organism_min_conf)
     print(regs[["region", "n", "text"]].to_string(index=False))
     print(f"figures in {rep}")
 
 
-def figures(obj, regs, cen, rois, src, rep, name):
+def figures(obj, regs, cen, rois, src, rep, name, org_ids=(), org_pool=0, org_min_conf=0.0):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.offsetbox import AnnotationBbox, OffsetImage
     handles = [matplotlib.lines.Line2D([], [], ls="", marker="o", ms=7, color=COLOR[c],
                                        label=f"{LABEL[c]} ({(obj.pred == c).mean():.0%})") for c in CLASSES]
-    pred_of = obj.set_index("dup_group").pred
+    by_id = obj.set_index("dup_group")
 
-    def scatter(ax):
+    def scatter(ax, mark=()):
         o = obj.iloc[np.random.default_rng(0).permutation(len(obj))]
         ax.scatter(o.x, o.y, s=2.5 if len(o) > 5000 else 6, c=o.pred.map(COLOR), alpha=0.6, linewidths=0,
                    rasterized=True)
+        if len(mark):
+            m = by_id.loc[list(mark)]
+            ax.scatter(m.x, m.y, s=26, facecolors="none", edgecolors="black", linewidths=0.9, zorder=3)
         for r, p in cen.iterrows():
             ax.text(p.x, p.y, str(r), ha="center", va="center", fontsize=12, weight="bold", color="black",
-                    bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="black", lw=0.8, alpha=0.9))
+                    bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="black", lw=0.8, alpha=0.9), zorder=4)
         ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_visible(False)
+
+    def tile(ax, rid, xy, zoom, lw=1.5):
+        try:
+            im = thumb(src / rois.loc[rid, "path"], 96)
+        except Exception:
+            return
+        ax.add_artist(AnnotationBbox(OffsetImage(np.asarray(im), zoom=zoom), xy, frameon=True, pad=0.04,
+                                     bboxprops=dict(ec=COLOR[by_id.loc[rid, "pred"]], lw=lw)))
 
     # 1. the map alone
     fig, ax = plt.subplots(figsize=(9, 7.5), dpi=200)
@@ -642,23 +661,36 @@ def figures(obj, regs, cen, rois, src, rep, name):
     fig.savefig(rep / "cluster_map.png")
     plt.close(fig)
 
-    # 2. slide: map + region key with example images (16:9)
+    # 2. slide (16:9): map, a strip of predicted organisms under it, and the region key with examples
     k, dpi = len(regs), 150
-    fig = plt.figure(figsize=(16, 9), dpi=dpi)
-    ax = fig.add_axes([0.01, 0.09, 0.50, 0.80])
-    scatter(ax)
-    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=5, frameon=False, fontsize=10.5,
-              handletextpad=0.2, columnspacing=1.2)
+    W, H = 16, 9
+    fig = plt.figure(figsize=(W, H), dpi=dpi)
     fig.text(0.012, 0.955, f"CPICS, {name}: {len(obj):,} particles arranged by image similarity",
              fontsize=16, weight="bold")
     fig.text(0.012, 0.918, "Each dot is one particle, coloured by the model's predicted class; similar-looking "
              "particles sit together. “Blurry” = too out of focus to classify. "
              "Preliminary: model trained on May–June 2026 labels.", fontsize=10.5, color="#333")
+    has_org = len(org_ids) > 0
+    map_box = [0.01, 0.33, 0.50, 0.56] if has_org else [0.01, 0.09, 0.50, 0.80]
+    ax = fig.add_axes(map_box)
+    scatter(ax, mark=org_ids)
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=5, frameon=False,
+              fontsize=10.5, handletextpad=0.2, columnspacing=1.2)
+    if has_org:
+        cols = int(np.ceil(len(org_ids) / 2))
+        strip = fig.add_axes([0.012, 0.015, 0.50, 0.215])
+        strip.set_xlim(0, cols); strip.set_ylim(2, 0); strip.axis("off")
+        cell_in = min(W * 0.50 / cols, H * 0.215 / 2)
+        z = 0.86 * cell_in * 72 / 96
+        for j, rid in enumerate(org_ids):
+            tile(strip, rid, (j % cols + 0.5, j // cols + 0.5), z)
+        how = f"model confidence ≥ {org_min_conf:.0%}, " if org_min_conf > 0 else ""
+        fig.text(0.012, 0.245, f"Predicted organisms: {len(org_ids)} drawn at random ({how}from {org_pool:,}); "
+                 "circled on the map", fontsize=11, weight="bold")
     key_h = 0.84
-    key = fig.add_axes([0.53, 0.06, 0.46, key_h])
+    key = fig.add_axes([0.53, 0.04, 0.46, key_h])
     key.set_xlim(0, 1); key.set_ylim(k, 0); key.axis("off")
-    row_in = 9 * key_h / k
-    zoom = 0.80 * row_in * 72 / 96   # OffsetImage scales by dpi/72, so this gives 0.8 of a row
+    zoom = 0.80 * (H * key_h / k) * 72 / 96
     n_ex = max([len(r.split()) for r in regs.examples] + [1])
     x0, dx = 1.0 - n_ex * 0.112 + 0.056, 0.112
     for i, r in enumerate(regs.itertuples()):
@@ -670,14 +702,7 @@ def figures(obj, regs, cen, rois, src, rep, name):
         key.text(0.08, y + 0.2, f"{r.n:,} particles ({r.share_all:.0%} of all)", va="center", fontsize=9.5,
                  color="#444")
         for j, rid in enumerate(r.examples.split()):
-            try:
-                im = thumb(src / rois.loc[rid, "path"], 96)
-            except Exception:
-                continue
-            key.add_artist(AnnotationBbox(OffsetImage(np.asarray(im), zoom=zoom), (x0 + j * dx, y), frameon=True,
-                                          pad=0.04, bboxprops=dict(ec=COLOR[pred_of.loc[rid]], lw=1.5)))
-    fig.text(0.53, 0.018, "Examples: particles of each region's main class(es) nearest its centre, scaled to fit "
-             "(not to size); border colour = predicted class.", fontsize=8.5, color="#555")
+            tile(key, rid, (x0 + j * dx, y), zoom)
     fig.savefig(rep / "cluster_map_slide.png")
     plt.close(fig)
 
@@ -719,7 +744,11 @@ def main(argv=None):
     ap.add_argument("--method", choices=["umap", "tsne"], default="umap")
     ap.add_argument("--neighbors", type=int, default=30)
     ap.add_argument("--regions", type=int, default=8)
-    ap.add_argument("--examples", type=int, default=4)
+    ap.add_argument("--examples", type=int, default=4, help="map/figures: example images per region")
+    ap.add_argument("--seed", type=int, default=0, help="map/figures: seed for the random example draws")
+    ap.add_argument("--organisms", type=int, default=18, help="map/figures: predicted organisms in the slide strip")
+    ap.add_argument("--organism-min-conf", type=float, default=0.0,
+                    help="map/figures: draw strip organisms only from those with model confidence >= this")
     ap.add_argument("--title", help="cruise name for figure titles, e.g. 'January 2026 Chance USV cruise'")
     ap.add_argument("--atlas-sample", type=int, default=4000)
     ap.add_argument("--max-seconds", type=float, help="dedup: stop fingerprinting after this long (re-run continues)")
