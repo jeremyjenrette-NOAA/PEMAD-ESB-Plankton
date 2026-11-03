@@ -8,7 +8,7 @@ Plan: see the "CPICS Plankton Classification — Execution Plan" doc in the Clau
 ## Layout
 
 ```
-configs/default.yaml       paths on the Mac (data_root = the CPICS folder this repo sits in)
+configs/default.yaml       paths on the Mac (data on the portable SSD: /Volumes/PortableSSD/saltnoaa/CPICS)
 configs/workstation.yaml   paths on the GCP workstation
 configs/splits.yaml        FROZEN split assignment (val/test days, eval sample) — commit it
 cpics/ingest.py            V3 annotations + ROICoord + image headers -> labels/labels.csv
@@ -65,3 +65,25 @@ python scripts/check_env.py --config configs/workstation.yaml
 **Repeat captures.** CPICS re-saves an object that stays in view as a new ROI every frame
 (20260521: 7,125 ROIs but only 33 distinct objects). Training should sample by `dup_group`
 (one draw per group per epoch, or weight 1/dup_size), and counts for ecology should count groups.
+
+## Run a new, unlabeled cruise (e.g. January 2026 Chance USV)
+
+Preliminary: applies the Phase 1 DINOv2 baseline (trained on May-June 2026 V3 labels) to a cruise
+nobody has labeled. See the docstring of `cpics/cruise.py` for what each step does.
+
+```bash
+# Mac (no GPU needed): list ROIs (full frames are skipped), group repeat captures, pack ROIs only
+python -m cpics.cruise inventory --name jan2026 --src "/Volumes/PortableSSD/saltnoaa/CPICS/January_2026_usv"
+python -m cpics.cruise dedup     --name jan2026
+python -m cpics.cruise package   --name jan2026      # -> <work_dir>/cruises/jan2026/jan2026_rois.tar
+gcloud storage cp /Volumes/PortableSSD/saltnoaa/CPICS/cpics_ml/cruises/jan2026/jan2026_rois.tar \
+  "gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS_ml/cruises/jan2026/"
+
+# GPU workstation: embed, classify, map (~5-10 min on the T4)
+git pull && scripts/cruise_workstation.sh jan2026
+git add reports/cruises/jan2026 && git commit -m "jan2026 preliminary run" && git push
+```
+
+Outputs in `reports/cruises/<name>/`: `summary.md` (class shares by object and ROI, corrected range,
+per day, caveats), `class_shares.png`, `cluster_map.png`, `cluster_map_slide.png` (16:9, map + region
+key with example images), `map_regions.csv`, `objects_by_day.csv`, `objects_by_hour.csv`.
