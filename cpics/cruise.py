@@ -60,6 +60,7 @@ FRAME_SIZE = (2736, 2192)
 # "resting object" bursts (pair precision 1.00, recall 0.88) but not most scattered repeats, which are
 # rare (< 1 % of ROIs outside 20260521). Looser settings chained distinct look-alike particles (rings).
 GAP_S, SIZE_TOL, HASH_BITS, CORR, PERSIST_S = 5, 0.10, 4, 0.95, 10
+MAX_MISFIT = 0.10   # classify: largest L1 misfit at which the confusion correction is reported
 
 
 # ---------------------------------------------------------------- helpers
@@ -359,7 +360,7 @@ def fit_baseline(cfg, model):
                 eval_true=ev.y.to_numpy(), eval_pred=ev_pred)
 
 
-def adjusted_shares(true, pred, observed, classes):
+def adjusted_shares(true, pred, observed, classes, return_fit=False):
     """Correct observed predicted-class shares for the confusions seen on a labeled set.
     observed = M^T q, M[i, j] = P(pred j | true i); solve for q >= 0, sum 1 (least squares)."""
     from scipy.optimize import nnls
@@ -375,7 +376,10 @@ def adjusted_shares(true, pred, observed, classes):
     A = np.vstack([M.T, 10 * np.ones(k)])
     b = np.r_[observed, 10.0]
     q, _ = nnls(A, b)
-    return q / q.sum()
+    q = q / q.sum()
+    if return_fit:
+        return q, float(np.abs(M.T @ q - observed).sum())
+    return q
 
 
 def share_table(frame, col="pred"):
@@ -421,7 +425,11 @@ def cmd_classify(args, cfg):
 
     so, sr = share_table(obj), share_table(df)
     obs = np.array([so[c] for c in CLASSES])
-    adj = adjusted_shares(m["eval_true"], m["eval_pred"], obs, CLASSES)
+    adj, misfit = adjusted_shares(m["eval_true"], m["eval_pred"], obs, CLASSES, return_fit=True)
+    # misfit = L1 gap between the observed mix and the best mix the eval confusions can produce.
+    # A large gap means the model behaves differently on this cruise than on the eval days, and the
+    # correction is not meaningful.
+    corr_ok = misfit <= MAX_MISFIT
     rng = np.random.default_rng(0)
     boot = []
     n = len(m["eval_true"])
@@ -449,12 +457,20 @@ def cmd_classify(args, cfg):
          "| class | share of objects (model) | share of ROIs (model) | objects, corrected for known model "
          "confusions (90% range) |", "|---|---|---|---|"]
     for i, c in enumerate(CLASSES):
-        L.append(f"| {LABEL[c]} | {so[c]:.1%} | {sr[c]:.1%} | {adj[i]:.1%} ({lo[i]:.0%}-{hi[i]:.0%}) |")
-    L += ["", "The corrected column inverts the confusion matrix the model showed on the eval_newdays set "
-          f"({n} objects from unlabeled May-June days, labeled by Jeremy: "
-          + ", ".join(f"{LABEL[c].lower()} {int(ev_counts.get(c, 0))}" for c in CLASSES)
-          + "). It assumes January confuses classes the way those days did, which is untested; read the "
-            "two columns as a range, not a precise value.", "",
+        cc = f"{adj[i]:.1%} ({lo[i]:.0%}-{hi[i]:.0%})" if corr_ok else "n/a"
+        L.append(f"| {LABEL[c]} | {so[c]:.1%} | {sr[c]:.1%} | {cc} |")
+    ev_txt = (f"{n} objects from unlabeled May-June days, labeled by Jeremy: "
+              + ", ".join(f"{LABEL[c].lower()} {int(ev_counts.get(c, 0))}" for c in CLASSES))
+    if corr_ok:
+        L += ["", f"The corrected column inverts the confusion matrix the model showed on the eval_newdays set "
+              f"({ev_txt}). It assumes this cruise confuses classes the way those days did, which is untested; "
+              "read the two columns as a range, not a precise value.", ""]
+    else:
+        L += ["", f"**Correction not applicable** (misfit {misfit:.2f} > {MAX_MISFIT}). No mix of true classes, "
+              f"confused the way the model confused them on the eval_newdays set ({ev_txt}), can produce the "
+              "predicted mix seen on this cruise. The model is behaving differently here than on May-June days "
+              "(a domain shift), so the class shares above should be treated as rough and checked by eye.", ""]
+    L += [
           "## By day (objects)", "", "| day | objects | " + " | ".join(LABEL[c] for c in CLASSES) + " |",
           "|---" * (len(CLASSES) + 2) + "|"]
     for d, r in by_day.iterrows():
@@ -477,11 +493,12 @@ def cmd_classify(args, cfg):
     (rep / "summary.md").write_text("\n".join(L) + "\n")
     (rep / "summary.json").write_text(json.dumps(dict(
         n_rois=len(df), n_objects=len(obj), share_objects=so, share_rois=sr,
+        correction_misfit=misfit, correction_applicable=bool(corr_ok),
         share_objects_corrected={c: float(adj[i]) for i, c in enumerate(CLASSES)},
         corrected_lo={c: float(lo[i]) for i, c in enumerate(CLASSES)},
         corrected_hi={c: float(hi[i]) for i, c in enumerate(CLASSES)},
         organism_flag_share=float(obj.organism_flag.mean())), indent=2))
-    plot_shares(by_day, so, adj, rep / "class_shares.png", args.name)
+    plot_shares(by_day, so, adj if corr_ok else None, rep / "class_shares.png", args.title or args.name)
     print("\n".join(L[:16]))
 
 
@@ -489,8 +506,10 @@ def plot_shares(by_day, so, adj, out, name):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    rows = [("All objects (model)", np.array([so[c] for c in CLASSES])),
-            ("All objects (corrected)", np.asarray(adj))]
+    rows = [("All objects (model)", np.array([so[c] for c in CLASSES]))]
+    if adj is not None:
+        rows.append(("All objects (corrected)", np.asarray(adj)))
+    n_top = len(rows)
     for d, r in by_day.iterrows():
         rows.append((f"{d[:4]}-{d[4:6]}-{d[6:]}  (n={int(r.sum()):,})", (r / r.sum()).to_numpy()))
     fig, ax = plt.subplots(figsize=(10, 0.45 * len(rows) + 1.4), dpi=200)
@@ -505,18 +524,22 @@ def plot_shares(by_day, so, adj, out, name):
     ax.invert_yaxis()
     ax.set_xlim(0, 1)
     ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
-    ax.axhline(1.5, color="#444", lw=0.6)
+    ax.axhline(n_top - 0.5, color="#444", lw=0.6)
     for s in ["top", "right"]:
         ax.spines[s].set_visible(False)
     ax.legend(handles=[matplotlib.patches.Patch(color=COLOR[c], label=LABEL[c]) for c in CLASSES],
               ncol=5, loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False, fontsize=9)
-    ax.set_title(f"CPICS {name}: predicted class of each distinct object (preliminary)", fontsize=10, pad=26)
+    ax.set_title(f"CPICS {name}: predicted class of each distinct particle (preliminary)", fontsize=10, pad=26)
     fig.tight_layout()
     fig.savefig(out)
     plt.close(fig)
 
 
 # ---------------------------------------------------------------- map
+MAP_COLS = ["dup_group", "day", "hour_dir", "n_captures", "width", "height"] + [f"p_{c}" for c in CLASSES] + \
+           ["pred", "confidence", "organism_flag", "x", "y", "region"]
+
+
 def thumb(path, px=96):
     with Image.open(path) as im:
         return pad_square(im.convert("RGB")).resize((px, px), Image.BICUBIC)
@@ -524,9 +547,7 @@ def thumb(path, px=96):
 
 def cmd_map(args, cfg):
     work, rep = cruise_dirs(cfg, args.name)
-    src = src_dir(work, args.src)
     obj = pd.read_csv(work / "objects.csv", dtype={"dup_group": str, "day": str, "hour_dir": str})
-    rois = read_rois(work).set_index("roi_id")
     X = load_embeddings(work / "embeddings", args.model, obj.dup_group)
     if args.method == "umap":
         import umap
@@ -537,34 +558,56 @@ def cmd_map(args, cfg):
     from sklearn.cluster import KMeans
     obj["x"], obj["y"] = xy[:, 0], xy[:, 1]
     km = KMeans(n_clusters=args.regions, n_init=10, random_state=0).fit(xy)
-    obj["region"] = km.labels_
     # number regions left-to-right, top-to-bottom so the figure reads in order
     cen = pd.DataFrame(km.cluster_centers_, columns=["x", "y"])
     order = cen.assign(r=np.round(-cen.y / (np.ptp(xy[:, 1]) / 3))).sort_values(["r", "x"]).index
     remap = {old: new + 1 for new, old in enumerate(order)}
-    obj["region"] = obj.region.map(remap)
-    cen.index = cen.index.map(remap)
-    cen = cen.sort_index()
+    obj["region"] = pd.Series(km.labels_).map(remap).to_numpy()
+    obj.to_csv(work / "map.csv", index=False, float_format="%.4f")
+    # compact copy in reports/ so figures and atlases can be rebuilt on the Mac without the workstation
+    obj[MAP_COLS].to_csv(rep / "map.csv.gz", index=False, float_format="%.3f", compression="gzip")
+    cmd_figures(args, cfg, obj=obj)
+    if args.atlas_sample:
+        atlas_json(obj, read_rois(work).set_index("roi_id"), src_dir(work, args.src), work, args.atlas_sample)
+
+
+def summarise_regions(obj, n_ex):
+    """Majority class per region, its share, a short label, and example objects of the region's main classes
+    (nearest the region centre, so the strip shows what the label says)."""
+    cen = obj.groupby("region")[["x", "y"]].mean()
     regs = []
     for r, s in obj.groupby("region"):
         vc = s.pred.value_counts(normalize=True)
-        top, share = vc.index[0], vc.iloc[0]
-        second = (f"{LABEL[vc.index[1]].lower()} {vc.iloc[1]:.0%}" if len(vc) > 1 else "")
+        top, share = vc.index[0], float(vc.iloc[0])
+        sec, sec_share = (vc.index[1], float(vc.iloc[1])) if len(vc) > 1 else ("", 0.0)
+        mixed = share < 0.6
+        text = (f"Mixed: {LABEL[top].lower()} {share:.0%}, {LABEL[sec].lower()} {sec_share:.0%}" if mixed
+                else f"Mostly {LABEL[top].lower()} ({share:.0%})")
         d = np.hypot(s.x - cen.loc[r, "x"], s.y - cen.loc[r, "y"])
-        ex = s.assign(d=d.to_numpy()).nsmallest(args.examples * 4, "d")
-        ex = ex.sample(min(args.examples, len(ex)), random_state=r).sort_values("d")
-        regs.append(dict(region=r, n=len(s), share_all=len(s) / len(obj), majority=top, majority_share=share,
-                         second=second, examples=" ".join(ex.dup_group)))
-    regs = pd.DataFrame(regs)
-    regs["text"] = [("Mostly " if sh >= 0.6 else "Mixed, leaning ") + LABEL[m].lower() + f" ({sh:.0%})"
-                    for m, sh in zip(regs.majority, regs.majority_share)]
-    obj.to_csv(work / "map.csv", index=False, float_format="%.4f")
+        s = s.assign(d=d.to_numpy())
+        want = [(top, n_ex - n_ex // 2), (sec, n_ex // 2)] if mixed and sec else [(top, n_ex)]
+        ex = []
+        for c, k in want:
+            pool = s[s.pred == c].nsmallest(k * 4, "d")
+            ex += pool.sample(min(k, len(pool)), random_state=int(r)).sort_values("d").dup_group.tolist()
+        regs.append(dict(region=int(r), n=len(s), share_all=len(s) / len(obj), majority=top, majority_share=share,
+                         second=sec, second_share=sec_share, text=text, examples=" ".join(ex)))
+    return pd.DataFrame(regs), cen
+
+
+def cmd_figures(args, cfg, obj=None):
+    """Region summary + figures from the map. Re-runnable on the Mac from reports/cruises/<name>/map.csv.gz
+    (no embeddings or GPU needed; needs the ROI images for the example strips: --src)."""
+    work, rep = cruise_dirs(cfg, args.name)
+    if obj is None:
+        f = work / "map.csv" if (work / "map.csv").exists() else rep / "map.csv.gz"
+        obj = pd.read_csv(f, dtype={"dup_group": str, "day": str, "hour_dir": str})
+    rois = read_rois(work).set_index("roi_id")
+    regs, cen = summarise_regions(obj, args.examples)
     regs.drop(columns=["examples"]).to_csv(rep / "map_regions.csv", index=False, float_format="%.3f")
-    regs[["region", "examples"]].to_csv(work / "map_region_examples.csv", index=False)
-    figures(obj, regs, cen, rois, src, rep, args.name)
-    if args.atlas_sample:
-        atlas_json(obj, rois, src, work, args.atlas_sample)
-    print(regs[["region", "n", "text", "second"]].to_string(index=False))
+    regs[["region", "examples"]].to_csv(rep / "map_region_examples.csv", index=False)
+    figures(obj, regs, cen, rois, src_dir(work, args.src), rep, args.title or args.name)
+    print(regs[["region", "n", "text"]].to_string(index=False))
     print(f"figures in {rep}")
 
 
@@ -573,66 +616,68 @@ def figures(obj, regs, cen, rois, src, rep, name):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.offsetbox import AnnotationBbox, OffsetImage
-    handles = [matplotlib.lines.Line2D([], [], ls="", marker="o", ms=6, color=COLOR[c],
+    handles = [matplotlib.lines.Line2D([], [], ls="", marker="o", ms=7, color=COLOR[c],
                                        label=f"{LABEL[c]} ({(obj.pred == c).mean():.0%})") for c in CLASSES]
+    pred_of = obj.set_index("dup_group").pred
 
-    def scatter(ax, numbers=True):
-        rng = np.random.default_rng(0)
-        o = obj.iloc[rng.permutation(len(obj))]
-        ax.scatter(o.x, o.y, s=3 if len(o) > 5000 else 6, c=o.pred.map(COLOR), alpha=0.6, linewidths=0,
+    def scatter(ax):
+        o = obj.iloc[np.random.default_rng(0).permutation(len(obj))]
+        ax.scatter(o.x, o.y, s=2.5 if len(o) > 5000 else 6, c=o.pred.map(COLOR), alpha=0.6, linewidths=0,
                    rasterized=True)
-        if numbers:
-            for r, p in cen.iterrows():
-                ax.text(p.x, p.y, str(r), ha="center", va="center", fontsize=11, weight="bold", color="black",
-                        bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="black", lw=0.8, alpha=0.9))
+        for r, p in cen.iterrows():
+            ax.text(p.x, p.y, str(r), ha="center", va="center", fontsize=12, weight="bold", color="black",
+                    bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="black", lw=0.8, alpha=0.9))
         ax.set_xticks([]); ax.set_yticks([])
-        for s in ax.spines.values():
-            s.set_visible(False)
+        for sp in ax.spines.values():
+            sp.set_visible(False)
 
     # 1. the map alone
     fig, ax = plt.subplots(figsize=(9, 7.5), dpi=200)
     scatter(ax)
     ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=5, frameon=False,
-              fontsize=9, title="Predicted class (share of objects)", title_fontsize=9)
-    ax.set_title(f"CPICS {name}: {len(obj):,} distinct objects arranged by image similarity (DINOv2 + UMAP)",
+              fontsize=9, title="Predicted class (share of particles)", title_fontsize=9)
+    ax.set_title(f"CPICS, {name}: {len(obj):,} particles arranged by image similarity (DINOv2 + UMAP)",
                  fontsize=10)
     fig.tight_layout()
     fig.savefig(rep / "cluster_map.png")
     plt.close(fig)
 
     # 2. slide: map + region key with example images (16:9)
-    k = len(regs)
-    fig = plt.figure(figsize=(16, 9), dpi=150)
-    ax = fig.add_axes([0.01, 0.08, 0.50, 0.84])
+    k, dpi = len(regs), 150
+    fig = plt.figure(figsize=(16, 9), dpi=dpi)
+    ax = fig.add_axes([0.01, 0.09, 0.50, 0.80])
     scatter(ax)
-    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=5, frameon=False, fontsize=10)
-    fig.text(0.01, 0.955, f"CPICS {name}: {len(obj):,} distinct objects, arranged by image similarity",
-             fontsize=15, weight="bold")
-    fig.text(0.01, 0.925, "Each dot is one object; colour = model's predicted class. Numbered regions are "
-             "summarised at right. Preliminary: model trained on May-June 2026 labels.", fontsize=10, color="#333")
-    key = fig.add_axes([0.53, 0.04, 0.46, 0.86])
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=5, frameon=False, fontsize=10.5,
+              handletextpad=0.2, columnspacing=1.2)
+    fig.text(0.012, 0.955, f"CPICS, {name}: {len(obj):,} particles arranged by image similarity",
+             fontsize=16, weight="bold")
+    fig.text(0.012, 0.918, "Each dot is one particle, coloured by the model's predicted class; similar-looking "
+             "particles sit together. “Blurry” = too out of focus to classify. "
+             "Preliminary: model trained on May–June 2026 labels.", fontsize=10.5, color="#333")
+    key_h = 0.84
+    key = fig.add_axes([0.53, 0.06, 0.46, key_h])
     key.set_xlim(0, 1); key.set_ylim(k, 0); key.axis("off")
+    row_in = 9 * key_h / k
+    zoom = 0.80 * row_in * 72 / 96   # OffsetImage scales by dpi/72, so this gives 0.8 of a row
+    n_ex = max([len(r.split()) for r in regs.examples] + [1])
+    x0, dx = 1.0 - n_ex * 0.112 + 0.056, 0.112
     for i, r in enumerate(regs.itertuples()):
         y = i + 0.5
-        key.text(0.0, y, str(r.region), ha="center", va="center", fontsize=11, weight="bold",
+        key.text(0.02, y, str(r.region), ha="center", va="center", fontsize=12, weight="bold",
                  bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="black", lw=0.8))
-        key.add_patch(matplotlib.patches.Rectangle((0.035, y - 0.28), 0.012, 0.56, color=COLOR[r.majority]))
-        key.text(0.06, y - 0.12, r.text, va="center", fontsize=11, weight="bold")
-        key.text(0.06, y + 0.2, f"{r.n:,} objects ({r.share_all:.0%})" + (f"; next: {r.second}" if r.second else ""),
-                 va="center", fontsize=9, color="#444")
-        ids = r.examples.split()
-        for j, rid in enumerate(ids):
+        key.add_patch(matplotlib.patches.Rectangle((0.055, y - 0.3), 0.012, 0.6, color=COLOR[r.majority]))
+        key.text(0.08, y - 0.13, r.text, va="center", fontsize=11, weight="bold")
+        key.text(0.08, y + 0.2, f"{r.n:,} particles ({r.share_all:.0%} of all)", va="center", fontsize=9.5,
+                 color="#444")
+        for j, rid in enumerate(r.examples.split()):
             try:
                 im = thumb(src / rois.loc[rid, "path"], 96)
             except Exception:
                 continue
-            zoom = min(0.9, 0.75 * fig.get_size_inches()[1] * 0.86 / k * 150 / 96 * 0.6)
-            key.add_artist(AnnotationBbox(OffsetImage(np.asarray(im), zoom=zoom), (0.47 + j * 0.105, y),
-                                          frameon=True, pad=0.05,
-                                          bboxprops=dict(ec=COLOR[obj.set_index('dup_group').loc[rid, 'pred']],
-                                                         lw=1.2)))
-    fig.text(0.53, 0.015, "Example images are captures nearest each region's centre, scaled to fit (not to size); "
-             "border colour = predicted class.", fontsize=8.5, color="#555")
+            key.add_artist(AnnotationBbox(OffsetImage(np.asarray(im), zoom=zoom), (x0 + j * dx, y), frameon=True,
+                                          pad=0.04, bboxprops=dict(ec=COLOR[pred_of.loc[rid]], lw=1.5)))
+    fig.text(0.53, 0.018, "Examples: particles of each region's main class(es) nearest its centre, scaled to fit "
+             "(not to size); border colour = predicted class.", fontsize=8.5, color="#555")
     fig.savefig(rep / "cluster_map_slide.png")
     plt.close(fig)
 
@@ -661,7 +706,7 @@ def atlas_json(obj, rois, src, work, n):
 # ---------------------------------------------------------------- main
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("step", choices=["inventory", "dedup", "package", "embed", "classify", "map"])
+    ap.add_argument("step", choices=["inventory", "dedup", "package", "embed", "classify", "map", "figures"])
     ap.add_argument("--name", required=True, help="short cruise name, e.g. jan2026")
     ap.add_argument("--src", help="cruise image folder (<src>/<day>/<hour>/*.png)")
     ap.add_argument("--config")
@@ -674,7 +719,8 @@ def main(argv=None):
     ap.add_argument("--method", choices=["umap", "tsne"], default="umap")
     ap.add_argument("--neighbors", type=int, default=30)
     ap.add_argument("--regions", type=int, default=8)
-    ap.add_argument("--examples", type=int, default=5)
+    ap.add_argument("--examples", type=int, default=4)
+    ap.add_argument("--title", help="cruise name for figure titles, e.g. 'January 2026 Chance USV cruise'")
     ap.add_argument("--atlas-sample", type=int, default=4000)
     ap.add_argument("--max-seconds", type=float, help="dedup: stop fingerprinting after this long (re-run continues)")
     args = ap.parse_args(argv)
@@ -682,7 +728,7 @@ def main(argv=None):
         ap.error("inventory needs --src")
     cfg = config.load(args.config)
     {"inventory": cmd_inventory, "dedup": cmd_dedup, "package": cmd_package, "embed": cmd_embed,
-     "classify": cmd_classify, "map": cmd_map}[args.step](args, cfg)
+     "classify": cmd_classify, "map": cmd_map, "figures": cmd_figures}[args.step](args, cfg)
 
 
 if __name__ == "__main__":
