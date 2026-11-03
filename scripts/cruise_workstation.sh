@@ -6,10 +6,11 @@
 # Needs the Phase 1 May-June DINOv2 embeddings in /home/user/data/cpics_ml/embeddings (from scripts/phase1.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-NAME=${1:?cruise name, e.g. jan2026}
+# NAME=${1:?cruise name, e.g. jan2026}
+NAME=jan2026
 CFG=configs/workstation.yaml
 WORK=/home/user/data/cpics_ml/cruises/$NAME
-BUCKET="gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS_ml/cruises/$NAME"
+BUCKET="gs://nmfs-dev-uc1-landing-bucket/NEFSC/Plankton Optics/CPICS/cruises/$NAME"
 mkdir -p "$WORK"
 if [ ! -d "$WORK/rois" ]; then
   [ -f "$WORK/${NAME}_rois.tar" ] || gcloud storage cp "$BUCKET/${NAME}_rois.tar" "$WORK/"

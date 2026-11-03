@@ -668,7 +668,7 @@ def main(argv=None):
     ap.add_argument("--model", default="dinov2")
     ap.add_argument("--out", help="package: tar path")
     ap.add_argument("--batch", type=int, default=128)
-    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--refit", action="store_true", help="classify: refit the baseline even if cached")
     ap.add_argument("--method", choices=["umap", "tsne"], default="umap")

@@ -1,0 +1,40 @@
+{
+  "n_rois": 27380,
+  "n_objects": 27344,
+  "share_objects": {
+    "organism": 0.1167715038033938,
+    "marine_snow": 0.2566193680514921,
+    "ring": 0.011812463428905793,
+    "blurry": 0.6122001170275014,
+    "artifact": 0.002596547688706846
+  },
+  "share_rois": {
+    "organism": 0.11669101533966399,
+    "marine_snow": 0.2564280496712929,
+    "ring": 0.01197954711468225,
+    "blurry": 0.6123082542001461,
+    "artifact": 0.0025931336742147553
+  },
+  "share_objects_corrected": {
+    "organism": 0.0,
+    "marine_snow": 0.0,
+    "ring": 0.0,
+    "blurry": 1.0,
+    "artifact": 0.0
+  },
+  "corrected_lo": {
+    "organism": 0.0,
+    "marine_snow": 0.0,
+    "ring": 0.0,
+    "blurry": 0.9955045359638529,
+    "artifact": 0.0
+  },
+  "corrected_hi": {
+    "organism": 0.0,
+    "marine_snow": 0.0,
+    "ring": 0.004495464036147063,
+    "blurry": 1.0,
+    "artifact": 0.0
+  },
+  "organism_flag_share": 0.32946898771211236
+}
