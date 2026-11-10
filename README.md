@@ -87,3 +87,12 @@ git add reports/cruises/jan2026 && git commit -m "jan2026 preliminary run" && gi
 Outputs in `reports/cruises/<name>/`: `summary.md` (class shares by object and ROI, corrected range,
 per day, caveats), `class_shares.png`, `cluster_map.png`, `cluster_map_slide.png` (16:9, map + region
 key with example images), `map_regions.csv`, `objects_by_day.csv`, `objects_by_hour.csv`.
+
+## Organism groups (Nov 2026)
+
+`labels/organism_pool.csv` lists every likely organism (human-confirmed or model-predicted, May-June and
+January 2026). On the workstation, `scripts/organisms_workstation.sh` gathers their DINOv2 embeddings, adds
+BioCLIP zero-shot group suggestions, groups them into visual clusters (~45 each) and writes `labeler_data/` for
+the cluster labeler in `labeler/` (Google Apps Script or offline; see `labeler/README.md`).
+Rules: `docs/annotation_rules_v1.1.md`. Final agreement round: `labels/final_round/final_set.csv`
+(score with `python -m cpics.calibration A.csv B.csv --names Jeremy Jordan --sample labels/final_round/final_set.csv --out labels/final_round`).

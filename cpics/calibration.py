@@ -47,11 +47,13 @@ def main(argv=None):
     ap.add_argument("second")
     ap.add_argument("--names", nargs=2, default=None)
     ap.add_argument("--config")
+    ap.add_argument("--sample", help="sample CSV with roi_id and stratum (default labels/calibration/calibration_set.csv)")
+    ap.add_argument("--out", help="output folder for the report and adjudication sheet (default labels/calibration)")
     a = ap.parse_args(argv)
     cfg = config.load(a.config)
     n1, n2 = a.names or [Path(a.first).stem, Path(a.second).stem]
     A, B = load(a.first), load(a.second)
-    sample = pd.read_csv(cfg["labels_dir"] / "calibration" / "calibration_set.csv", dtype=str).set_index("roi_id")
+    sample = pd.read_csv(a.sample or cfg["labels_dir"] / "calibration" / "calibration_set.csv", dtype=str).set_index("roi_id")
     ids = sorted(set(A.index) & set(B.index) & set(sample.index))
     A, B = A.loc[ids], B.loc[ids]
     k_cls, p_cls = kappa(A["class"], B["class"], CLASSES)
@@ -70,11 +72,24 @@ def main(argv=None):
          f"| Organism vs. not | {p_org:.0%} | {k_org:.2f} |",
          f"| Focus (sharp / blurry) | {p_foc:.0%} | {k_foc:.2f} |",
          f"| Needs box (objects both called organism, n={int(both_org.sum())}) | {p_box:.0%} | {k_box:.2f} |",
-         f"| Multiple | {p_mul:.0%} | {k_mul:.2f} |", "",
+         f"| Multiple | {p_mul:.0%} | {k_mul:.2f} |"]
+    if "group" in A.columns and "group" in B.columns:
+        gA, gB = A.group[both_org].replace("", "none"), B.group[both_org].replace("", "none")
+        cats = sorted(set(gA) | set(gB))
+        k_g, p_g = kappa(gA, gB, cats)
+        L.append(f"| Organism group, Level 1 (objects both called organism, n={int(both_org.sum())}) | {p_g:.0%} | {k_g:.2f} |")
+        t2 = pd.crosstab(gA, gB).reindex(index=cats, columns=cats, fill_value=0)
+        G = ["", f"## Organism group confusion ({n1} rows, {n2} columns)", "",
+             "| | " + " | ".join(cats) + " |", "|---" * (len(cats) + 1) + "|"]
+        G += [f"| {c} | " + " | ".join(str(v) for v in t2.loc[c]) + " |" for c in cats]
+    else:
+        G = []
+    L += ["",
          f"## Class confusion ({n1} rows, {n2} columns)", "",
          "| | " + " | ".join(CLASSES) + " |", "|---" * (len(CLASSES) + 1) + "|"]
     t = pd.crosstab(A["class"], B["class"]).reindex(index=CLASSES, columns=CLASSES, fill_value=0)
     L += [f"| {c} | " + " | ".join(str(v) for v in t.loc[c]) + " |" for c in CLASSES]
+    L += G
     L += ["", "## Agreement by sampling stratum", "", "| stratum | objects | class agreement |", "|---|---|---|"]
     st = sample.loc[ids, "stratum"]
     for s, g in st.groupby(st):
@@ -86,7 +101,8 @@ def main(argv=None):
     m = (dis[f"{n1}_class"] != dis[f"{n2}_class"]) | (dis[f"{n1}_focus"] != dis[f"{n2}_focus"]) | \
         (both_org.values & (dis[f"{n1}_needs_box"] != dis[f"{n2}_needs_box"]))
     dis = dis[m].assign(agreed_class="", agreed_focus="", agreed_needs_box="", rule="", comment="")
-    out = cfg["labels_dir"] / "calibration"
+    out = Path(a.out) if a.out else cfg["labels_dir"] / "calibration"
+    out.mkdir(parents=True, exist_ok=True)
     dis.to_csv(out / "adjudication.csv", index=False)
     L += ["", f"{len(dis)} objects need adjudication: see adjudication.csv "
           "(fill agreed_class / agreed_focus / agreed_needs_box and the rule that settled it)."]

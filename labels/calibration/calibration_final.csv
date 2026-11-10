@@ -1,0 +1,101 @@
+roi_id,class,focus,multiple,count,expert_flag,note,source
+20260515_131245.778.0,unidentifiable,blurry,False,,False,likely marine snow but too blurry to  be sure,agreed
+20260515_131641.861.0,unidentifiable,blurry,False,,False,Too blurry to identify,agreed
+20260515_131808.734.0,unidentifiable,blurry,False,,False,"Possibly marine snow, but too blurry to confirm",agreed
+20260515_133056.338.0,artifact,blurry,False,,False,,agreed
+20260516_000958.880.0,artifact,blurry,False,,False,,agreed
+20260516_012153.094.0,artifact,blurry,False,,False,,jordan_priority
+20260517_144226.329.1,unidentifiable,blurry,False,,False,Too blurry to identify,agreed
+20260517_144311.458.0,artifact,blurry,False,,False,,jordan_priority
+20260517_182016.148.0,unidentifiable,blurry,False,,False,Too blurry to identify,agreed
+20260517_182442.355.1,unidentifiable,blurry,False,,True,"Potential organism due to cup-like shape, but too blurry to be sure",agreed
+20260522_145504.300.0,marine_snow,blurry,False,,False,,agreed
+20260522_150538.286.0,marine_snow,blurry,False,,False,,agreed
+20260522_150831.249.0,marine_snow,blurry,False,,False,,agreed
+20260522_151127.722.0,marine_snow,blurry,False,,False,,jordan_priority
+20260522_155449.239.0,marine_snow,sharp,False,,False,,jordan_priority
+20260522_155806.728.0,organism,blurry,False,,False,,agreed
+20260522_163041.406.1,marine_snow,sharp,False,,False,,agreed
+20260522_164126.898.0,organism,blurry,False,,True,I'd flag an expert. This has straight lines which lean me towards organism but color in the middle is more marine snow.,jordan_priority
+20260522_170443.652.0,marine_snow,blurry,False,,False,,agreed
+20260523_122928.938.0,unidentifiable,blurry,False,,False,Too blurry to identify,agreed
+20260523_124040.632.0,artifact,sharp,False,,False,,jordan_priority
+20260523_125840.142.0,organism,blurry,False,,True,I have trouble with these. Would flag an expert to confirm that it's an organism.,jordan_priority
+20260523_151530.278.0,ring,sharp,False,,False,,jordan_priority
+20260523_174509.624.0,ring,sharp,False,,False,,jordan_priority
+20260523_174525.136.0,artifact,sharp,False,,False,,jordan_priority
+20260523_175954.929.0,marine_snow,blurry,False,,False,,agreed
+20260524_023246.806.0,marine_snow,blurry,False,,False,,agreed
+20260525_131634.808.0,organism,sharp,False,,False,golden worm-like,jordan_priority
+20260525_133409.557.0,artifact,sharp,False,,False,,jordan_priority
+20260525_151808.043.0,marine_snow,blurry,False,,False,,agreed
+20260526_030150.091.0,unidentifiable,blurry,False,,False,Organism-like in color but too blurry to confirm.,jordan_priority
+20260526_030510.032.0,marine_snow,blurry,False,,False,,agreed
+20260526_030553.082.0,organism,blurry,False,,False,,agreed
+20260526_044205.349.0,unidentifiable,blurry,False,,False,This is potentially a stick-like organism but the image is too pixelated to be sure.,jordan_priority
+20260526_074407.545.0,marine_snow,blurry,False,,False,,agreed
+20260526_075131.122.0,marine_snow,blurry,False,,False,,agreed
+20260526_095813.376.0,organism,sharp,False,,False,stick-like,jordan_priority
+20260526_232508.080.1,unidentifiable,blurry,False,,False,Too pixelated to confirm if there are organisms in the back.,jordan_priority
+20260526_232813.530.0,organism,blurry,False,,False,stick-like,agreed
+20260526_232841.154.0,organism,blurry,False,,False,flat ring like organism on bottom,agreed
+20260526_232936.118.0,organism,blurry,True,2,False,"Stick like organism on left, marine snow in front",jordan_priority
+20260526_233003.854.0,marine_snow,blurry,False,,False,,agreed
+20260526_233012.559.0,unidentifiable,blurry,False,,False,Too blurry to confirm,agreed
+20260526_233657.401.1,marine_snow,blurry,False,,False,,agreed
+20260527_012158.170.0,organism,blurry,False,,False,stick-like,agreed
+20260527_012304.180.0,organism,blurry,False,,False,,agreed
+20260527_072718.255.0,marine_snow,blurry,False,,False,,agreed
+20260527_090441.393.0,marine_snow,blurry,False,,False,,agreed
+20260528_000523.550.0,organism,blurry,False,,False,"Blurry, but stick-like portions clear on right",agreed
+20260528_002042.036.0,marine_snow,blurry,False,,False,,agreed
+20260528_102751.164.0,marine_snow,blurry,False,,False,,agreed
+20260528_140841.452.0,organism,blurry,False,,False,,agreed
+20260528_182802.620.0,organism,sharp,True,3,False,"worm-like, flattened ring like organisms on top and bottom",jordan_priority
+20260528_190823.234.0,unidentifiable,blurry,False,,False,Too blurry to confirm,jordan_priority
+20260528_194145.075.0,ring,sharp,False,,False,,jordan_priority
+20260528_195538.220.0,artifact,blurry,False,,False,,jordan_priority
+20260528_195829.832.3,artifact,blurry,False,,False,,jordan_priority
+20260528_203542.170.0,artifact,blurry,False,,False,,agreed
+20260528_205839.401.0,artifact,blurry,False,,False,,agreed
+20260528_205931.814.0,ring,sharp,False,,False,,jordan_priority
+20260528_211649.340.0,unidentifiable,blurry,False,,True,"This is possibly an artifact, but I would flag an expert",jordan_priority
+20260528_222137.975.0,marine_snow,blurry,False,,False,,agreed
+20260529_000932.562.0,organism,blurry,False,,False,,agreed
+20260529_000955.058.0,organism,blurry,True,2,False,"Organism in front, possible organism in back as well",agreed
+20260601_004759.390.0,marine_snow,blurry,False,,False,,agreed
+20260601_041043.154.0,organism,blurry,True,2,False,Organism on top right,jordan_priority
+20260601_041302.916.0,marine_snow,blurry,False,,False,,agreed
+20260601_042236.752.0,marine_snow,blurry,False,,False,,agreed
+20260601_042923.064.0,organism,blurry,True,2,False,"Marine snow in center, organism like structures on top and bottom",jordan_priority
+20260601_071808.123.0,marine_snow,blurry,False,,False,,agreed
+20260601_071824.074.0,organism,blurry,True,2,False,"Marine snow in front, organism like shape on bottom and in back",agreed
+20260601_072124.591.3,artifact,blurry,False,,False,,jordan_priority
+20260601_074340.035.0,unidentifiable,blurry,False,,True,"This could be an artifact, but potentially could be legs. Would flag expert.",jordan_priority
+20260601_122121.896.0,organism,blurry,False,,False,,agreed
+20260601_122132.776.0,organism,blurry,False,,False,worm-like,jordan_priority
+20260601_210134.532.0,ring,blurry,True,2,False,"stick-like organism in back, ring like organism on left possible marine snow in front",jordan_priority
+20260601_215037.369.0,artifact,blurry,False,,False,,jordan_priority
+20260601_215631.830.0,unidentifiable,blurry,False,,True,I would guess that this is an artifact due to the rainbow color and shape. But the break on the right is causing me to second guess. Would flag an expert.,agreed
+20260601_224008.686.1,ring,sharp,False,,False,,agreed
+20260601_225324.582.0,unidentifiable,blurry,False,,False,Blurry streaks. Possible artifact but too blurry to confirm.,agreed
+20260601_231036.548.0,unidentifiable,blurry,False,,True,Would flag an expert to determine if this is an artifact or legs,jordan_priority
+20260601_231220.261.0,ring,sharp,False,,False,,agreed
+20260601_231522.492.0,artifact,blurry,False,,False,,agreed
+20260601_232135.401.1,marine_snow,blurry,False,,False,,jordan_priority
+20260601_232424.033.0,ring,sharp,False,,False,,agreed
+20260601_233007.887.2,artifact,blurry,False,,False,,jordan_priority
+20260601_235132.654.0,organism,blurry,False,,False,,jordan_priority
+20260602_150855.919.0,artifact,sharp,False,,False,,jordan_priority
+20260602_173411.598.0,marine_snow,blurry,False,,False,,agreed
+20260603_190830.118.0,organism,blurry,False,,False,,agreed
+20260604_061649.434.0,organism,blurry,False,,False,,agreed
+20260608_035532.982.0,organism,blurry,False,,False,,agreed
+20260608_194258.340.0,organism,blurry,True,2,False,"flattened ring like organisms on left and top right, worm like organisms on right",agreed
+20260608_200247.577.0,organism,blurry,False,,False,,agreed
+20260609_055207.380.0,organism,blurry,True,2,False,"Blurry, organism on right, organism in back center",agreed
+20260609_192750.465.0,marine_snow,blurry,False,,False,,jordan_priority
+20260610_000518.988.0,marine_snow,blurry,False,,False,,agreed
+20260610_125851.715.0,artifact,sharp,False,,False,,agreed
+20260612_183133.214.0,organism,sharp,False,,False,,jordan_priority
+20260617_011933.022.1,organism,sharp,True,2,False,"Stick like organism on left center/top, rest artifact",jordan_priority

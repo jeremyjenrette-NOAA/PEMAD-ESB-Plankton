@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CPICS Organism Groups</title>
+<style>
+/* Cluster labeler for CPICS organism groups. Runs as a Google Apps Script web app (labels go to a Google Sheet)
+   or offline from a local folder (labels stay in this browser; export CSV). */
+:root{
+  --bg:#eef1f4; --surface:#fff; --line:#d5dbe2; --fg:#16202b; --muted:#5a6776; --accent:#1f6f8b; --accent-ink:#fff;
+  --sel:#e0a100; --ok:#1a8a5a; --warn:#b5531f; --stage:#000;
+  --g-crustacean:#c0532d; --g-gelatinous:#2f86b8; --g-worm_like:#a8741a; --g-fish_like:#7a4fb8;
+  --g-protozoan:#1a8a5a; --g-phyto_colonial:#5e8f1f; --g-other_organism:#8a5a7a; --g-unsure_organism:#6b7785; --g-not_organism:#3a3f46;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1117; --surface:#131a22; --line:#243040; --fg:#e4e9ef; --muted:#93a1b1; --accent:#4fb3d4; --accent-ink:#06121a;
+  --sel:#f0c040; --ok:#3cc488; --warn:#ec7a52; --g-not_organism:#9aa3ad; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1117; --surface:#131a22; --line:#243040; --fg:#e4e9ef; --muted:#93a1b1; --accent:#4fb3d4;
+  --accent-ink:#06121a; --sel:#f0c040; --ok:#3cc488; --warn:#ec7a52; --g-not_organism:#9aa3ad; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--body)}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:18px;margin:0}
+.who{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.who input{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;width:150px}
+.status{font:12px var(--mono);color:var(--muted)}
+.status.ok{color:var(--ok)} .status.warn{color:var(--warn)}
+.btn{font:500 13px var(--body);border-radius:6px;padding:6px 11px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:calc(100vh - 54px)}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)} aside{max-height:260px}}
+aside{border-right:1px solid var(--line);background:var(--surface);overflow:auto;max-height:calc(100vh - 54px);position:sticky;top:54px}
+aside .head{padding:10px 12px;display:grid;gap:6px;border-bottom:1px solid var(--line)}
+aside select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.clist{list-style:none;margin:0;padding:4px}
+.clist button{width:100%;display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;text-align:left;background:transparent;color:var(--fg);border:1px solid transparent;border-radius:6px;padding:6px 8px;cursor:pointer;font:inherit}
+.clist button:hover{border-color:var(--line)}
+.clist button.cur{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.clist .cid{font:12px var(--mono);color:var(--muted)}
+.clist .sg{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clist .pg{font:11px var(--mono);color:var(--muted)}
+.clist .bar{grid-column:1/-1;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.clist .bar i{display:block;height:100%;background:var(--ok)}
+main{padding:12px 16px 150px;display:grid;gap:12px;align-content:start}
+.chead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.chead h2{margin:0;font-size:16px}
+.chead .meta{color:var(--muted);font-size:13px}
+.tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.tools label{display:flex;gap:6px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tile,120px),1fr));gap:6px}
+.tile{position:relative;aspect-ratio:1;background:var(--stage);border:2px solid transparent;border-radius:5px;overflow:hidden;cursor:pointer;padding:0}
+.tile img{width:100%;height:100%;object-fit:contain;display:block;image-rendering:auto}
+.tile.true img{object-fit:none}
+.tile.sel{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel)}
+.tile .lab{position:absolute;left:0;right:0;bottom:0;font:600 10.5px var(--body);color:#fff;padding:2px 4px;background:rgba(0,0,0,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .lab[data-g]{background:var(--gc)}
+.tile .hum{position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#fff;opacity:.85}
+.tile .cr{position:absolute;top:2px;right:3px;font:10px var(--mono);color:#cfd9e4}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;border:1px solid #888;margin-right:5px}
+.bar-bottom{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:8px 16px;display:grid;gap:6px;z-index:6}
+.groups{display:flex;flex-wrap:wrap;gap:6px}
+.gbtn{display:flex;align-items:center;gap:6px;font:500 13px var(--body);color:var(--fg);background:transparent;border:1px solid var(--line);border-left:5px solid var(--gc);border-radius:6px;padding:5px 9px;cursor:pointer}
+.gbtn:hover{background:color-mix(in srgb,var(--gc) 12%,var(--surface))}
+.gbtn kbd,.keys kbd{font:500 11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--bg);color:var(--fg)}
+.detail{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.detail select,.detail input{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.detail input[type=text]{width:180px}
+.hint{font-size:12.5px;color:var(--muted)}
+.hint b{color:var(--fg)}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:grid;place-items:center;z-index:20}
+.lightbox figure{margin:0;display:grid;gap:8px;justify-items:center;color:#dfe6ee;font:12px var(--mono)}
+.lightbox img{image-rendering:pixelated;background:#000;max-width:90vw;max-height:78vh}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CPICS organism groups</h1>
+  <div class="who"><label for="who">Labeler</label><input id="who" placeholder="Your name" autocomplete="name"></div>
+  <div class="status" id="status" aria-live="polite">Loading…</div>
+  <div style="display:flex;gap:6px">
+    <button class="btn ghost" id="export" type="button">Export my labels (CSV)</button>
+  </div>
+</header>
+<div class="layout">
+  <aside aria-label="Clusters">
+    <div class="head">
+      <div id="overall" class="status"></div>
+      <label class="hint">Show
+        <select id="cfilter"><option value="todo">Clusters I have not finished</option><option value="all">All clusters</option></select>
+      </label>
+    </div>
+    <ul class="clist" id="clist"></ul>
+  </aside>
+  <main>
+    <div class="chead">
+      <div>
+        <h2 id="ctitle">–</h2>
+        <div class="meta" id="cmeta"></div>
+      </div>
+      <div class="tools">
+        <button class="btn ghost" id="selAll" type="button">Select all (A)</button>
+        <button class="btn ghost" id="selUnl" type="button">Select unlabeled (U)</button>
+        <button class="btn ghost" id="selNone" type="button">Clear selection (Esc)</button>
+        <label>Size <input id="tsize" type="range" min="80" max="220" value="120"></label>
+        <label><input id="trueSize" type="checkbox"> actual pixels</label>
+      </div>
+    </div>
+    <div class="legend"><span><i></i>labeled organism by a person in an earlier round</span><span>Double-click an image to enlarge it.</span></div>
+    <div class="grid" id="grid"><div class="empty">Loading clusters…</div></div>
+  </main>
+</div>
+<div class="bar-bottom">
+  <div class="groups" id="groups"></div>
+  <div class="detail">
+    <label>Finer group <select id="g2"><option value="">— (pick a group first)</option></select></label>
+    <label>Species / taxon <input id="species" type="text" placeholder="optional"></label>
+    <label>Note <input id="note" type="text" placeholder="optional"></label>
+    <label><input id="flag" type="checkbox"> Expert flag</label>
+    <button class="btn" id="next" type="button">Next cluster (N)</button>
+  </div>
+  <div class="hint" id="hint"><b>Select</b> images (click, Shift-click for a range), then press a group key. With <b>nothing selected</b>, a group key labels <b>every unlabeled image</b> in the cluster, so label the odd ones out first.</div>
+</div>
+<div class="lightbox" id="lb" hidden><figure><img id="lbImg" alt=""><figcaption id="lbCap"></figcaption></figure></div>
+
+<script>
+const GROUPS = [
+  {key:'1', id:'crustacean', name:'Crustacean', sub:['copepod','nauplius','cladoceran','crustacean larva','other crustacean']},
+  {key:'2', id:'gelatinous', name:'Gelatinous', sub:['appendicularian','cnidarian','ctenophore','salp/doliolid']},
+  {key:'3', id:'worm_like', name:'Worm-like', sub:['chaetognath','polychaete','other worm-like']},
+  {key:'4', id:'fish_like', name:'Fish-like', sub:['fish egg','fish larva']},
+  {key:'5', id:'protozoan', name:'Protozoan', sub:['radiolarian/foraminiferan','ciliate','other protozoan']},
+  {key:'6', id:'phyto_colonial', name:'Phytoplankton / colonial', sub:['diatom chain','single diatom','dinoflagellate','other colony']},
+  {key:'7', id:'other_organism', name:'Other organism', sub:[]},
+  {key:'8', id:'unsure_organism', name:'Unsure organism', sub:[]},
+  {key:'9', id:'not_organism', name:'Not an organism', sub:['marine snow','ring/bubble','artifact','unidentifiable']},
+];
+const G = Object.fromEntries(GROUPS.map(g => [g.id, g]));
+const $ = id => document.getElementById(id);
+const GAS = typeof google !== 'undefined' && google.script && google.script.run;
+const LS = 'cpics-orggroups-v1';
+
+// ---------- storage: Apps Script (shared Sheet) or this browser only
+function gas(fn, ...a){ return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...a)); }
+const api = {
+  manifest: async () => GAS ? JSON.parse(await gas('getManifest')) : (await fetch('manifest.json')).json(),
+  cluster: async f => GAS ? JSON.parse(await gas('getCluster', f)) : (await fetch('clusters/' + f)).json(),
+  labels: async who => GAS ? JSON.parse(await gas('getLabels', who)) : [],
+  save: async rows => GAS ? gas('saveLabels', rows) : rows.length,
+  whoami: async () => GAS ? gas('whoAmI').catch(() => '') : '',
+};
+function lsGet(){ try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch { return {}; } }
+function lsSet(v){ try { localStorage.setItem(LS, JSON.stringify(v)); } catch {} }
+
+let manifest = null, cur = null, items = [], sel = new Set(), anchor = -1;
+let store = lsGet();               // {labeler: name, labels: {objectId: rec}, pending: [rec], clusterDone: {cid: n}}
+store.labels = store.labels || {}; store.pending = store.pending || []; store.counts = store.counts || {};
+const me = () => (store.labeler || '').trim();
+
+function setStatus(t, cls){ const s = $('status'); s.textContent = t; s.className = 'status' + (cls ? ' ' + cls : ''); }
+
+// ---------- cluster list
+function counts(cid){ return store.counts[cid] || 0; }
+function recount(){
+  const c = {}; for (const r of Object.values(store.labels)) if (r.labeler === me()) c[r.cluster] = (c[r.cluster] || 0) + 1;
+  store.counts = c; lsSet(store);
+}
+function renderList(){
+  const ul = $('clist'); ul.textContent = '';
+  const f = $('cfilter').value; let doneC = 0, doneO = 0;
+  for (const c of manifest.clusters){
+    const n = counts(c.id); if (n >= c.n) doneC++; doneO += Math.min(n, c.n);
+    if (f === 'todo' && n >= c.n && (!cur || c.id !== cur.id)) continue;
+    const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button';
+    if (cur && c.id === cur.id) b.className = 'cur';
+    const id = document.createElement('span'); id.className = 'cid'; id.textContent = '#' + c.id;
+    const sg = document.createElement('span'); sg.className = 'sg';
+    sg.textContent = c.suggestion ? (G[c.suggestion] ? G[c.suggestion].name : c.suggestion) + ' ?' : '—';
+    sg.title = c.suggestion ? `BioCLIP suggestion for ${Math.round(100 * c.suggestion_share)}% of this cluster` : '';
+    const pg = document.createElement('span'); pg.className = 'pg'; pg.textContent = `${Math.min(n, c.n)}/${c.n}`;
+    const bar = document.createElement('span'); bar.className = 'bar'; const i = document.createElement('i'); i.style.width = (100 * Math.min(n, c.n) / c.n) + '%'; bar.append(i);
+    b.append(id, sg, pg, bar); b.onclick = () => openCluster(c.id); li.append(b); ul.append(li);
+  }
+  const tot = manifest.clusters.reduce((a, c) => a + c.n, 0);
+  $('overall').textContent = `${me() || 'You'}: ${doneO.toLocaleString()} / ${tot.toLocaleString()} images · ${doneC}/${manifest.clusters.length} clusters done`;
+}
+
+// ---------- grid
+function labelOf(id){ const r = store.labels[id]; return r && r.labeler === me() ? r : null; }
+function renderGrid(){
+  const g = $('grid'); g.textContent = '';
+  if (!items.length){ const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'No images in this cluster.'; g.append(d); return; }
+  const trueSize = $('trueSize').checked;
+  items.forEach((it, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tile' + (sel.has(it.id) ? ' sel' : '') + (trueSize ? ' true' : '');
+    b.setAttribute('aria-pressed', sel.has(it.id));
+    const im = document.createElement('img'); im.src = it.img; im.alt = `ROI ${it.roi}`; im.loading = 'lazy'; b.append(im);
+    if (it.basis === 'human'){ const h = document.createElement('span'); h.className = 'hum'; h.title = 'labeled organism by a person earlier'; b.append(h); }
+    const cr = document.createElement('span'); cr.className = 'cr'; cr.textContent = it.cruise === 'jan2026' ? 'Jan' : 'May–Jun'; b.append(cr);
+    const l = labelOf(it.id);
+    if (l){ const s = document.createElement('span'); s.className = 'lab'; s.dataset.g = l.group; s.style.setProperty('--gc', `var(--g-${l.group})`);
+      s.textContent = (G[l.group] ? G[l.group].name : l.group) + (l.group2 ? ' · ' + l.group2 : '') + (l.species ? ' · ' + l.species : ''); b.append(s); }
+    b.title = `${it.roi} · ${it.w}×${it.h} px · ${it.cruise} · model p(organism) ${it.p}` + (it.sug ? ` · BioCLIP: ${(G[it.sug] || {}).name || it.sug} (${it.sug2})` : '');
+    b.onclick = e => clickTile(i, e); b.ondblclick = () => openLB(it);
+    g.append(b);
+  });
+}
+function clickTile(i, e){
+  const id = items[i].id;
+  if (e.shiftKey && anchor >= 0){ const [a, b] = [Math.min(anchor, i), Math.max(anchor, i)]; for (let k = a; k <= b; k++) sel.add(items[k].id); }
+  else { sel.has(id) ? sel.delete(id) : sel.add(id); anchor = i; }
+  paintSel(); updateHint();
+}
+function paintSel(){ document.querySelectorAll('#grid .tile').forEach((b, i) => { const on = !!items[i] && sel.has(items[i].id); b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on); }); }
+function updateHint(){
+  const n = sel.size, unl = items.filter(it => !labelOf(it.id)).length;
+  $('hint').innerHTML = n ? `<b>${n} selected.</b> Press a group key (1–9) to label them.`
+    : `<b>Nothing selected:</b> a group key labels the <b>${unl} unlabeled</b> images in this cluster. Select the odd ones out first (click, Shift-click for a range).`;
+}
+function openLB(it){ $('lbImg').src = it.img; $('lbImg').style.width = Math.min(window.innerWidth * 0.9, it.w * Math.min(6, 600 / Math.max(it.w, it.h))) + 'px';
+  $('lbCap').textContent = `${it.roi} · ${it.w}×${it.h} px · ${it.cruise} · day ${it.day}`; $('lb').hidden = false; }
+$('lb').onclick = () => { $('lb').hidden = true; };
+
+async function openCluster(cid){
+  const c = manifest.clusters.find(c => c.id === cid); if (!c) return;
+  cur = c; sel = new Set(); anchor = -1;
+  $('ctitle').textContent = `Cluster ${c.id} of ${manifest.clusters.length}`;
+  $('cmeta').textContent = `${c.n} images · ${c.cruises.map(x => x === 'jan2026' ? 'Jan 2026' : 'May–Jun 2026').join(' + ')} · ${c.human} labeled organism earlier · model p(organism) ${c.p}` +
+    (c.suggestion ? ` · BioCLIP suggests ${(G[c.suggestion] || {}).name || c.suggestion} for ${Math.round(100 * c.suggestion_share)}%` : '');
+  $('grid').innerHTML = '<div class="empty">Loading images…</div>';
+  try { items = (await api.cluster(c.file)).items; }
+  catch (e){ $('grid').innerHTML = '<div class="empty">Could not load this cluster. Reload the page to try again.</div>'; return; }
+  renderGrid(); renderList(); updateHint(); window.scrollTo(0, 0);
+  try { localStorage.setItem(LS + '-cur', String(cid)); } catch {}
+}
+function nextCluster(){
+  if (!manifest) return; const i = manifest.clusters.findIndex(c => c.id === (cur && cur.id));
+  for (let k = 1; k <= manifest.clusters.length; k++){ const c = manifest.clusters[(i + k) % manifest.clusters.length]; if (counts(c.id) < c.n) return openCluster(c.id); }
+  setStatus('Every cluster is labeled. Thank you!', 'ok');
+}
+
+// ---------- labeling
+function renderGroups(){
+  const box = $('groups'); box.textContent = '';
+  for (const g of GROUPS){ const b = document.createElement('button'); b.type = 'button'; b.className = 'gbtn'; b.style.setProperty('--gc', `var(--g-${g.id})`);
+    const k = document.createElement('kbd'); k.textContent = g.key; b.append(k, document.createTextNode(g.name)); b.onclick = () => apply(g.id); box.append(b); }
+}
+function allSubs(){
+  const s = $('g2'); s.textContent = ''; const o = document.createElement('option'); o.value = ''; o.textContent = '— (optional)'; s.append(o);
+  for (const g of GROUPS) for (const x of g.sub){ const op = document.createElement('option'); op.value = g.id + '|' + x; op.textContent = `${g.name}: ${x}`; s.append(op); }
+}
+async function apply(gid){
+  if (!me()){ $('who').focus(); setStatus('Type your name first, so your labels are kept apart from other people’s.', 'warn'); return; }
+  if (!cur) return;
+  const targets = sel.size ? items.filter(it => sel.has(it.id)) : items.filter(it => !labelOf(it.id));
+  if (!targets.length){ setStatus('Nothing to label: select images, or every image here is already labeled.', 'warn'); return; }
+  const [sg, sx] = ($('g2').value || '|').split('|');
+  const group2 = sg === gid ? sx : '';
+  const now = new Date().toISOString();
+  const rows = targets.map(it => ({labeler: me(), id: it.id, roi: it.roi, cruise: it.cruise, cluster: cur.id, group: gid, group2,
+    species: $('species').value.trim(), note: $('note').value.trim(), flag: $('flag').checked, at: now}));
+  for (const r of rows) store.labels[r.id] = r;
+  store.pending.push(...rows); recount(); lsSet(store);
+  sel = new Set(); $('species').value = ''; $('note').value = ''; $('flag').checked = false; $('g2').value = '';
+  renderGrid(); renderList(); updateHint();
+  flush();
+  if (items.every(it => labelOf(it.id))) setStatus(`Cluster ${cur.id} done. Press N for the next one.`, 'ok');
+}
+let flushing = false;
+async function flush(){
+  if (!GAS){ if (store.pending.length){ store.pending = []; lsSet(store); setStatus(`Saved in this browser (${Object.keys(store.labels).length} labels). Export CSV when you finish.`, 'ok'); } return; }
+  if (flushing || !store.pending.length) return; flushing = true;
+  const batch = store.pending.slice(0, 500);
+  setStatus('Saving…');
+  try { await api.save(batch); store.pending = store.pending.slice(batch.length); lsSet(store); setStatus('All labels saved to the shared sheet.', 'ok'); }
+  catch (e){ setStatus('Could not reach the sheet; labels are kept in this browser and will be sent when it is back.', 'warn'); }
+  flushing = false;
+  if (store.pending.length) setTimeout(flush, 15000);
+}
+$('export').onclick = () => {
+  const rows = [['labeler','object_id','roi_id','cruise','cluster','group','group2','species','note','expert_flag','labeled_at']];
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  for (const r of Object.values(store.labels)) if (r.labeler === me()) rows.push([r.labeler, r.id, r.roi, r.cruise, r.cluster, r.group, r.group2, r.species, r.note, r.flag, r.at].map(q));
+  const blob = new Blob([rows.map(r => r.join(',')).join('\n')], {type: 'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cpics_organism_groups_${me().replace(/\W+/g, '_') || 'labels'}.csv`; a.click();
+};
+
+// ---------- controls
+$('who').addEventListener('change', async e => { store.labeler = e.target.value.trim(); lsSet(store); await syncFromSheet(); recount(); renderList(); if (cur) renderGrid(); updateHint(); });
+$('cfilter').onchange = renderList;
+$('tsize').oninput = e => document.documentElement.style.setProperty('--tile', e.target.value + 'px');
+$('trueSize').onchange = renderGrid;
+$('selAll').onclick = () => { sel = new Set(items.map(it => it.id)); paintSel(); updateHint(); };
+$('selUnl').onclick = () => { sel = new Set(items.filter(it => !labelOf(it.id)).map(it => it.id)); paintSel(); updateHint(); };
+$('selNone').onclick = () => { sel = new Set(); paintSel(); updateHint(); };
+$('next').onclick = nextCluster;
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!$('lb').hidden){ $('lb').hidden = true; return; }
+  const g = GROUPS.find(g => g.key === e.key); if (g){ e.preventDefault(); return apply(g.id); }
+  const k = e.key.toLowerCase();
+  if (k === 'a'){ e.preventDefault(); $('selAll').click(); }
+  else if (k === 'u'){ e.preventDefault(); $('selUnl').click(); }
+  else if (e.key === 'Escape'){ $('selNone').click(); }
+  else if (k === 'n'){ e.preventDefault(); nextCluster(); }
+});
+
+async function syncFromSheet(){
+  if (!GAS || !me()) return;
+  try {
+    const rows = await api.labels(me());
+    for (const r of rows){ const l = store.labels[r.id]; if (!l || l.labeler !== me() || (r.at && l.at && new Date(r.at) > new Date(l.at))) store.labels[r.id] = {...r, labeler: me()}; }
+    lsSet(store);
+  } catch (e){ setStatus('Could not read saved labels from the sheet; working from this browser.', 'warn'); }
+}
+
+(async () => {
+  renderGroups(); allSubs();
+  try { manifest = await api.manifest(); }
+  catch (e){ setStatus('Could not load the image set. ' + (GAS ? 'Check the Drive folder ID in Code.gs.' : 'Open this page through a local web server (see README).'), 'warn'); $('grid').innerHTML = ''; return; }
+  if (!store.labeler){ const w = await api.whoami(); if (w) store.labeler = w; }
+  $('who').value = store.labeler || '';
+  await syncFromSheet(); recount();
+  setStatus(GAS ? 'Connected to the shared sheet.' : 'Offline mode: labels are saved in this browser only. Export CSV when you finish.', GAS ? 'ok' : 'warn');
+  let start = null; try { start = parseInt(localStorage.getItem(LS + '-cur')); } catch {}
+  const first = manifest.clusters.find(c => c.id === start) || manifest.clusters.find(c => counts(c.id) < c.n) || manifest.clusters[0];
+  renderList(); if (first) openCluster(first.id);
+  flush();
+})();
+</script>
+</body>
+</html>
